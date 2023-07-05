@@ -933,14 +933,18 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @description
         // Returns a list of all structure types known to the server.
         // Generally used with <@link tag LocationTag.find.structure.within>.
-        // This is NOT their Bukkit names, as seen at <@link url https://hub.spigotmc.org/javadocs/spigot/org/bukkit/StructureType.html>.
-        // Instead these are the internal names tracked by Spigot and presumably matching Minecraft internals.
+        // This is NOT their Bukkit names, as seen at <@link url https://hub.spigotmc.org/javadocs/spigot/org/bukkit/generator/structure/Structure.html>.
+        // Instead, these are the internal names tracked by Spigot and presumably matching Minecraft internals.
         // These are all lowercase, as the internal names are lowercase and supposedly are case-sensitive.
-        // It is unclear why the "StructureType" class in Bukkit is not simply an enum as most similar listings are.
+        // It is unclear why the "Structure" class in Bukkit is not simply an enum as most similar listings are.
         // -->
         tagProcessor.registerTag(ListTag.class, "structure_types", (attribute, object) -> {
             listDeprecateWarn(attribute);
-            return new ListTag(StructureType.getStructureTypes().keySet());
+            ListTag structures = new ListTag();
+            Registry.STRUCTURE.forEach((structure -> {
+                structures.add(structure.getKey().getKey());
+            }));
+            return structures;
         }, "list_structure_types");
 
         // <--[tag]

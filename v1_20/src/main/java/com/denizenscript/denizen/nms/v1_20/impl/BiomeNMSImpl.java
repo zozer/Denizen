@@ -19,14 +19,14 @@ import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
-import org.bukkit.craftbukkit.v1_20_R1.CraftWorld;
-import org.bukkit.craftbukkit.v1_20_R1.util.CraftLocation;
+import org.bukkit.craftbukkit.v1_20_R4.CraftWorld;
+import org.bukkit.craftbukkit.v1_20_R4.entity.CraftEntityType;
+import org.bukkit.craftbukkit.v1_20_R4.util.CraftLocation;
 import org.bukkit.entity.EntityType;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 public class BiomeNMSImpl extends BiomeNMS {
@@ -136,12 +136,27 @@ public class BiomeNMSImpl extends BiomeNMS {
 
     @Override
     public void setFoliageColor(int color) {
-        try {
-            ReflectionHelper.setFieldValue(BiomeSpecialEffects.class, ReflectionMappingsInfo.BiomeSpecialEffects_foliageColorOverride, biomeHolder.value().getSpecialEffects(), Optional.of(color));
-        }
-        catch (Throwable ex) {
-            Debug.echoError(ex);
-        }
+        ReflectionHelper.setFieldValue(BiomeSpecialEffects.class, ReflectionMappingsInfo.BiomeSpecialEffects_foliageColorOverride, biomeHolder.value().getSpecialEffects(), Optional.of(color));
+    }
+
+    @Override
+    public int getFogColor() {
+        return biomeHolder.value().getFogColor();
+    }
+
+    @Override
+    public void setFogColor(int color) {
+        ReflectionHelper.setFieldValue(BiomeSpecialEffects.class, ReflectionMappingsInfo.BiomeSpecialEffects_fogColor, biomeHolder.value().getSpecialEffects(), color);
+    }
+
+    @Override
+    public int getWaterFogColor() {
+        return biomeHolder.value().getWaterFogColor();
+    }
+
+    @Override
+    public void setWaterFogColor(int color) {
+        ReflectionHelper.setFieldValue(BiomeSpecialEffects.class, ReflectionMappingsInfo.BiomeSpecialEffects_waterFogColor, biomeHolder.value().getSpecialEffects(), color);
     }
 
     private List<EntityType> getSpawnableEntities(MobCategory creatureType) {
@@ -152,17 +167,7 @@ public class BiomeNMSImpl extends BiomeNMS {
             return entityTypes;
         }
         for (MobSpawnSettings.SpawnerData meta : typeSettingList.unwrap()) {
-            try {
-                String n = net.minecraft.world.entity.EntityType.getKey(meta.type).getPath();
-                EntityType et = EntityType.fromName(n);
-                if (et == null) {
-                    et = EntityType.valueOf(n.toUpperCase(Locale.ENGLISH));
-                }
-                entityTypes.add(et);
-            }
-            catch (Throwable e) {
-                // Ignore the error. Likely from invalid entity type name output.
-            }
+            entityTypes.add(CraftEntityType.minecraftToBukkit(meta.type));
         }
         return entityTypes;
     }

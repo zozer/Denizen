@@ -1,6 +1,8 @@
 package com.denizenscript.denizen.nms.v1_19.helpers;
 
 import com.denizenscript.denizen.Denizen;
+import com.denizenscript.denizen.events.entity.EntityEntersVehicleScriptEvent;
+import com.denizenscript.denizen.events.entity.EntityExitsVehicleScriptEvent;
 import com.denizenscript.denizen.nms.NMSHandler;
 import com.denizenscript.denizen.nms.interfaces.EntityHelper;
 import com.denizenscript.denizen.nms.util.jnbt.CompoundTag;
@@ -68,11 +70,14 @@ import org.bukkit.craftbukkit.v1_19_R3.entity.*;
 import org.bukkit.craftbukkit.v1_19_R3.event.CraftEventFactory;
 import org.bukkit.craftbukkit.v1_19_R3.inventory.CraftItemStack;
 import org.bukkit.entity.*;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
+import org.spigotmc.event.entity.EntityDismountEvent;
+import org.spigotmc.event.entity.EntityMountEvent;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Field;
@@ -166,12 +171,6 @@ public class EntityHelperImpl extends EntityHelper {
         ((CraftBlock) location.getBlock()).getNMS().use(((CraftWorld) location.getWorld()).getHandle(),
                 craftPlayer != null ? craftPlayer.getHandle() : null, InteractionHand.MAIN_HAND,
                 new BlockHitResult(new Vec3(0, 0, 0), null, pos, false));
-    }
-
-    @Override
-    public Entity getEntity(World world, UUID uuid) {
-        net.minecraft.world.entity.Entity entity = ((CraftWorld) world).getHandle().getEntity(uuid);
-        return entity == null ? null : entity.getBukkitEntity();
     }
 
     @Override
@@ -450,9 +449,8 @@ public class EntityHelperImpl extends EntityHelper {
     }
 
     @Override
-    public float getBaseYaw(Entity entity) {
-        net.minecraft.world.entity.Entity handle = ((CraftEntity) entity).getHandle();
-        return ((net.minecraft.world.entity.LivingEntity) handle).yBodyRot;
+    public float getBaseYaw(LivingEntity entity) {
+        return ((CraftLivingEntity) entity).getHandle().yBodyRot;
     }
 
     @Override
@@ -588,15 +586,15 @@ public class EntityHelperImpl extends EntityHelper {
     }
 
     @Override
-    public void setHeadAngle(Entity entity, float angle) {
+    public void setHeadAngle(LivingEntity entity, float angle) {
         net.minecraft.world.entity.LivingEntity handle = ((CraftLivingEntity) entity).getHandle();
         handle.yHeadRot = angle;
         handle.setYHeadRot(angle);
     }
 
     @Override
-    public void setEndermanAngry(Entity entity, boolean angry) {
-        ((CraftEnderman) entity).getHandle().getEntityData().set(ENTITY_ENDERMAN_DATAWATCHER_SCREAMING, angry);
+    public void setEndermanAngry(Enderman enderman, boolean angry) {
+        ((CraftEnderman) enderman).getHandle().getEntityData().set(ENTITY_ENDERMAN_DATAWATCHER_SCREAMING, angry);
     }
 
     public static class FakeDamageSrc extends DamageSource { public DamageSource real; public FakeDamageSrc(DamageSource src) { super(null); real = src; } }
@@ -723,9 +721,9 @@ public class EntityHelperImpl extends EntityHelper {
     public static final MethodHandle FALLINGBLOCK_TYPE_SETTER = ReflectionHelper.getFinalSetterForFirstOfType(net.minecraft.world.entity.item.FallingBlockEntity.class, BlockState.class);
 
     @Override
-    public void setFallingBlockType(FallingBlock entity, BlockData block) {
+    public void setFallingBlockType(FallingBlock fallingBlock, BlockData block) {
         BlockState state = ((CraftBlockData) block).getState();
-        FallingBlockEntity nmsEntity = ((CraftFallingBlock) entity).getHandle();
+        FallingBlockEntity nmsEntity = ((CraftFallingBlock) fallingBlock).getHandle();
         try {
             FALLINGBLOCK_TYPE_SETTER.invoke(nmsEntity, state);
         }
@@ -740,16 +738,6 @@ public class EntityHelperImpl extends EntityHelper {
         ServerLevel level = ((CraftWorld) spawner.getWorld()).getHandle();
         net.minecraft.world.entity.Entity nmsEntity = nmsSpawner.getSpawner().getOrCreateDisplayEntity(level, level.random, nmsSpawner.getBlockPos());
         return new EntityTag(nmsEntity.getBukkitEntity());
-    }
-
-    @Override
-    public void setFireworkLifetime(Firework firework, int ticks) {
-        ((CraftFirework) firework).getHandle().lifetime = ticks;
-    }
-
-    @Override
-    public int getFireworkLifetime(Firework firework) {
-        return ((CraftFirework) firework).getHandle().lifetime;
     }
 
     public static final Field ZOMBIE_INWATERTIME = ReflectionHelper.getFields(net.minecraft.world.entity.monster.Zombie.class).get(ReflectionMappingsInfo.Zombie_inWaterTime, int.class);
@@ -840,5 +828,34 @@ public class EntityHelperImpl extends EntityHelper {
     @Override
     public void setStepHeight(Entity entity, float stepHeight) {
         ((CraftEntity) entity).getHandle().setMaxUpStep(stepHeight);
+    }
+
+    @Override
+    public void openHorseInventory(Player player, AbstractHorse horse) {
+        net.minecraft.world.entity.animal.horse.AbstractHorse nmsHorse = ((CraftAbstractHorse) horse).getHandle();
+        ((CraftPlayer) player).getHandle().openHorseInventory(nmsHorse, nmsHorse.inventory);
+    }
+
+    public static class EntityEntersVehicleScriptEventImpl extends EntityEntersVehicleScriptEvent {
+        @EventHandler
+        public void onEntityMount(EntityMountEvent event) {
+            fire(event, event.getMount());
+        }
+    }
+
+    @Override
+    public Class<? extends EntityEntersVehicleScriptEvent> getEntersVehicleEventImpl() {
+        return EntityEntersVehicleScriptEventImpl.class;
+    }
+
+    public static class EntityExitsVehicleScriptEventImpl extends EntityExitsVehicleScriptEvent {
+        @EventHandler
+        public void onEntityMount(EntityDismountEvent event) {
+            fire(event, event.getDismounted());
+        }
+    }
+
+    public Class<? extends EntityExitsVehicleScriptEvent> getExitsVehicleEventImpl() {
+        return EntityExitsVehicleScriptEventImpl.class;
     }
 }

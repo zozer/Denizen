@@ -20,6 +20,7 @@ import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.List;
 
+// TODO: 1.20.6: PotionData API
 public class EntityAreaEffectCloud implements Property {
 
     public static boolean describes(ObjectTag entity) {
@@ -234,8 +235,7 @@ public class EntityAreaEffectCloud implements Property {
         // @mechanism EntityTag.wait_time
         // @group properties
         // @description
-        // Returns the duration an entity must be exposed to
-        // the Area Effect Cloud before its effect is applied.
+        // Returns the duration before the Area Effect Cloud starts applying potion effects.
         // -->
         if (attribute.startsWith("wait_time")) {
             return new DurationTag(getHelper().getWaitTime())
@@ -618,8 +618,7 @@ public class EntityAreaEffectCloud implements Property {
         // @name wait_time
         // @input DurationTag
         // @description
-        // Sets the duration an entity must be exposed to
-        // the Area Effect Cloud before its effect is applied.
+        // Sets the duration before the Area Effect Cloud starts applying potion effects.
         // @tags
         // <EntityTag.wait_time>
         // -->

@@ -162,7 +162,7 @@ public abstract class BukkitScriptEvent extends ScriptEvent {
         return false;
     }
 
-    public static HashSet<String> inventoryCouldMatchableText = new HashSet<>(List.of("inventory", "notable", "note"));
+    public static HashSet<String> inventoryCouldMatchableText = new HashSet<>(List.of("inventory", "notable", "note", "gui"));
     public static HashSet<String> inventoryCouldMatchPrefixes = new HashSet<>(List.of("inventory_flagged"));
 
     public static boolean couldMatchInventory(String text) {
@@ -559,10 +559,10 @@ public abstract class BukkitScriptEvent extends ScriptEvent {
 
     @Override
     public ObjectTag getContext(String name) {
-        switch (name) {
-            case "reflect_event": return currentEvent == null ? null : new JavaReflectedObjectTag(currentEvent);
-        }
-        return super.getContext(name);
+        return switch (name) {
+            case "reflect_event" -> currentEvent == null ? null : new JavaReflectedObjectTag(currentEvent);
+            default -> super.getContext(name);
+        };
     }
 
     @Override

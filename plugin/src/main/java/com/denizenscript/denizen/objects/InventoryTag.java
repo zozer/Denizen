@@ -88,6 +88,7 @@ public class InventoryTag implements ObjectTag, Notable, Adjustable, FlaggableOb
     // Inventory note name: matches if the inventory is noted with the given name, using advanced matchers.
     // Inventory type: matches if the inventory is of a given type, using advanced matchers.
     // "inventory_flagged:<flag>": a Flag Matchable for InventoryTag flags.
+    // "gui" plaintext: matches if the inventory is a GUI (see <@link language inventory script containers>).
     //
     // -->
 
@@ -407,10 +408,9 @@ public class InventoryTag implements ObjectTag, Notable, Adjustable, FlaggableOb
                 continue;
             }
             String name = CoreUtilities.toLowerCase(data.get(0));
-            String description = ObjectFetcher.unescapeProperty(data.get(1));
-            ElementTag descriptionElement = new ElementTag(description);
-            Mechanism mechanism = new Mechanism(data.get(0), descriptionElement, context);
             if (!name.equals("holder") && !name.equals("uniquifier") && !name.equals("size") && !name.equals("script_name")) {
+                String description = ObjectFetcher.unescapeProperty(data.get(1));
+                Mechanism mechanism = new Mechanism(name, ObjectFetcher.pickObjectFor(description, context), context);
                 result.safeAdjust(mechanism);
             }
         }
@@ -2593,6 +2593,9 @@ public class InventoryTag implements ObjectTag, Notable, Adjustable, FlaggableOb
         }
         if (matcherLow.startsWith("inventory_flagged:")) {
             return flagTracker != null && BukkitScriptEvent.coreFlaggedCheck(comparedto.substring("inventory_flagged:".length()), flagTracker);
+        }
+        if (matcherLow.equals("gui")) {
+            return InventoryScriptHelper.isGUI(getInventory());
         }
         ScriptEvent.MatchHelper matcher = BukkitScriptEvent.createMatcher(comparedto);
         return compareInventoryToMatch(matcher);

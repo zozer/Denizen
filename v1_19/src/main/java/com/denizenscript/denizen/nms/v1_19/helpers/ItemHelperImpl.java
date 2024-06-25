@@ -91,27 +91,6 @@ public class ItemHelperImpl extends ItemHelper {
     public static Field RECIPE_MANAGER_BY_NAME = ReflectionHelper.getFields(RecipeManager.class).get(ReflectionMappingsInfo.RecipeManager_byName, Map.class);
 
     @Override
-    public void clearDenizenRecipes() {
-        RecipeManager recipeManager = ((CraftServer) Bukkit.getServer()).getServer().getRecipeManager();
-        Map<ResourceLocation, net.minecraft.world.item.crafting.Recipe<?>> byName;
-        try {
-            byName = (Map) RECIPE_MANAGER_BY_NAME.get(recipeManager);
-        }
-        catch (Throwable ex) {
-            Debug.echoError(ex);
-            return;
-        }
-        for (Object2ObjectLinkedOpenHashMap<ResourceLocation, net.minecraft.world.item.crafting.Recipe<?>> recipeMap : recipeManager.recipes.values()) {
-            for (ResourceLocation key : new ArrayList<>(recipeMap.keySet())) {
-                if (key.getNamespace().equalsIgnoreCase("denizen")) {
-                    recipeMap.remove(key);
-                    byName.remove(key);
-                }
-            }
-        }
-    }
-
-    @Override
     public void setShapedRecipeIngredient(ShapedRecipe recipe, char c, ItemStack[] item, boolean exact) {
         if (item.length == 1 && item[0].getType() == Material.AIR) {
             recipe.setIngredient(c, new RecipeChoice.MaterialChoice(Material.AIR));
@@ -168,11 +147,11 @@ public class ItemHelperImpl extends ItemHelper {
     }
 
     @Override
-    public void registerSmithingRecipe(String keyName, ItemStack result, ItemStack[] baseItem, boolean baseExact, ItemStack[] upgradeItem, boolean upgradeExact) {
+    public void registerSmithingRecipe(String keyName, ItemStack result, ItemStack[] baseItem, boolean baseExact, ItemStack[] upgradeItem, boolean upgradeExact, ItemStack[] templateItem, boolean templateExact) {
         ResourceLocation key = new ResourceLocation("denizen", keyName);
         Ingredient baseItemRecipe = itemArrayToRecipe(baseItem, baseExact);
         Ingredient upgradeItemRecipe = itemArrayToRecipe(upgradeItem, upgradeExact);
-        LegacyUpgradeRecipe recipe = new LegacyUpgradeRecipe(key, baseItemRecipe, upgradeItemRecipe, CraftItemStack.asNMSCopy(result)); // TODO: 1.19.4: smithing system was changed
+        LegacyUpgradeRecipe recipe = new LegacyUpgradeRecipe(key, baseItemRecipe, upgradeItemRecipe, CraftItemStack.asNMSCopy(result));
         ((CraftServer) Bukkit.getServer()).getServer().getRecipeManager().addRecipe(recipe);
     }
 
@@ -338,7 +317,10 @@ public class ItemHelperImpl extends ItemHelper {
             tag.put("display", display);
         }
         if (lore == null || lore.isEmpty()) {
-            display.put("Lore", null);
+            display.remove("Lore");
+            if (display.isEmpty()) {
+                tag.remove("display");
+            }
         }
         else {
             ListTag tagList = new ListTag();

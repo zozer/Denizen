@@ -3,12 +3,17 @@ package com.denizenscript.denizen.paper.utilities;
 import com.denizenscript.denizen.Denizen;
 import com.denizenscript.denizen.nms.NMSHandler;
 import com.denizenscript.denizen.nms.NMSVersion;
+import com.denizenscript.denizen.objects.ItemTag;
 import com.denizenscript.denizen.paper.PaperModule;
 import com.denizenscript.denizen.scripts.commands.entity.TeleportCommand;
+import com.denizenscript.denizen.scripts.containers.core.ItemScriptContainer;
+import com.denizenscript.denizen.scripts.containers.core.ItemScriptHelper;
 import com.denizenscript.denizen.utilities.FormattedTextHelper;
 import com.denizenscript.denizen.utilities.PaperAPITools;
 import com.denizenscript.denizencore.DenizenCore;
 import com.denizenscript.denizencore.utilities.CoreUtilities;
+import com.denizenscript.denizencore.utilities.ReflectionHelper;
+import com.denizenscript.denizencore.utilities.debugging.Debug;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
 import io.papermc.paper.entity.TeleportFlag;
@@ -32,6 +37,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Consumer;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class PaperAPIToolsImpl extends PaperAPITools {
@@ -156,19 +162,25 @@ public class PaperAPIToolsImpl extends PaperAPITools {
         entity.teleport(loc, cause, teleportFlags.toArray(new TeleportFlag[0]));
     }
 
-    public static HashMap<NamespacedKey, PotionMix> potionMixes = new HashMap<>();
+    record BrewingRecipeMatchers(String inputMatcher, String ingredientMatcher) {}
+    public static final Map<NamespacedKey, BrewingRecipeMatchers> potionMixes = new HashMap<>();
 
     @Override
-    public void registerBrewingRecipe(String keyName, ItemStack result, ItemStack[] inputItem, boolean inputExact, ItemStack[] ingredientItem, boolean ingredientExact) {
+    public void registerBrewingRecipe(String keyName, ItemStack result, String input, String ingredient, ItemScriptContainer itemScriptContainer) {
         if (!NMSHandler.getVersion().isAtLeast(NMSVersion.v1_18)) {
             throw new UnsupportedOperationException();
         }
+        RecipeChoice inputChoice = parseBrewingRecipeChoice(itemScriptContainer, input);
+        if (inputChoice == null) {
+            return;
+        }
+        RecipeChoice ingredientChoice = parseBrewingRecipeChoice(itemScriptContainer, ingredient);
+        if (ingredientChoice == null) {
+            return;
+        }
         NamespacedKey key = new NamespacedKey(Denizen.getInstance(), keyName);
-        RecipeChoice inputChoice = itemArrayToChoice(inputItem, inputExact);
-        RecipeChoice ingredientChoice = itemArrayToChoice(ingredientItem, ingredientExact);
-        PotionMix mix = new PotionMix(key, result, inputChoice, ingredientChoice);
-        potionMixes.put(key, mix);
-        Bukkit.getPotionBrewer().addPotionMix(mix);
+        potionMixes.put(key, new BrewingRecipeMatchers(input.startsWith("matcher:") ? input : null, ingredient.startsWith("matcher:") ? ingredient : null));
+        Bukkit.getPotionBrewer().addPotionMix(new PotionMix(key, result, inputChoice, ingredientChoice));
     }
 
     @Override
@@ -183,25 +195,43 @@ public class PaperAPIToolsImpl extends PaperAPITools {
         }
     }
 
-    public static RecipeChoice itemArrayToChoice(ItemStack[] item, boolean exact) {
-        if (exact) {
-            return new RecipeChoice.ExactChoice(item);
+    public static RecipeChoice parseBrewingRecipeChoice(ItemScriptContainer container, String choice) {
+        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_20) && choice.startsWith("matcher:")) {
+            String matcher = choice.substring("matcher:".length());
+            return PotionMix.createPredicateChoice(item -> new ItemTag(item).tryAdvancedMatcher(matcher));
         }
-        Material[] mats = new Material[item.length];
-        for (int i = 0; i < item.length; i++) {
-            mats[i] = item[i].getType();
+        boolean exact = true;
+        if (choice.startsWith("material:")) {
+            choice = choice.substring("material:".length());
+            exact = false;
+        }
+        ItemStack[] items = ItemScriptHelper.textToItemArray(container, choice, exact);
+        if (items == null) {
+            return null;
+        }
+        if (exact) {
+            return new RecipeChoice.ExactChoice(items);
+        }
+        Material[] mats = new Material[items.length];
+        for (int i = 0; i < items.length; i++) {
+            mats[i] = items[i].getType();
         }
         return new RecipeChoice.MaterialChoice(mats);
     }
 
     @Override
-    public boolean isDenizenMix(ItemStack currInput, ItemStack ingredient) {
-        for (PotionMix mix : potionMixes.values()) {
-            if (mix.getInput().getItemStack().isSimilar(currInput) && mix.getIngredient().getItemStack().isSimilar(ingredient)) {
-                return true;
-            }
-        }
-        return false;
+    public String getBrewingRecipeInputMatcher(NamespacedKey recipeId) {
+        return potionMixes.get(recipeId).inputMatcher();
+    }
+
+    @Override
+    public String getBrewingRecipeIngredientMatcher(NamespacedKey recipeId) {
+        return potionMixes.get(recipeId).ingredientMatcher();
+    }
+
+    @Override
+    public RecipeChoice createPredicateRecipeChoice(Predicate<ItemStack> predicate) {
+        return PotionMix.createPredicateChoice(predicate);
     }
 
     @Override
@@ -276,12 +306,20 @@ public class PaperAPIToolsImpl extends PaperAPITools {
 
     @Override
     public <T extends Entity> T spawnEntity(Location location, Class<T> type, Consumer<T> configure, CreatureSpawnEvent.SpawnReason reason) {
-        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_18)) {
-            return location.getWorld().spawn(location, type, configure, reason);
+        if (NMSHandler.getVersion().isAtMost(NMSVersion.v1_19)) {
+            // Takes the deprecated bukkit consumer on older versions
+            if (WORLD_SPAWN_BUKKIT_CONSUMER == null) {
+                WORLD_SPAWN_BUKKIT_CONSUMER = ReflectionHelper.getMethodHandle(RegionAccessor.class, "spawn", Location.class, Class.class, Consumer.class, CreatureSpawnEvent.SpawnReason.class);
+            }
+            try {
+                return (T) WORLD_SPAWN_BUKKIT_CONSUMER.invoke(location.getWorld(), location, type, configure, reason);
+            }
+            catch (Throwable e) {
+                Debug.echoError(e);
+                return null;
+            }
         }
-        else {
-            return super.spawnEntity(location, type, configure, reason);
-        }
+        return location.getWorld().spawn(location, type, configure, reason);
     }
 
     @Override
@@ -332,5 +370,11 @@ public class PaperAPIToolsImpl extends PaperAPITools {
     @Override
     public void kickPlayer(Player player, String message) {
         player.kick(PaperModule.parseFormattedText(message, ChatColor.WHITE));
+    }
+
+    @Override
+    public String getClientBrand(Player player) {
+        String clientBrand = player.getClientBrandName();
+        return clientBrand != null ? clientBrand : "unknown";
     }
 }

@@ -6,7 +6,6 @@ import com.denizenscript.denizen.nms.NMSVersion;
 import com.denizenscript.denizen.nms.interfaces.packets.PacketOutChat;
 import com.denizenscript.denizen.objects.EntityTag;
 import com.denizenscript.denizen.objects.ItemTag;
-import com.denizenscript.denizen.objects.WorldTag;
 import com.denizenscript.denizen.paper.events.*;
 import com.denizenscript.denizen.paper.properties.*;
 import com.denizenscript.denizen.paper.tags.PaperTagBase;
@@ -32,6 +31,7 @@ public class PaperModule {
         ScriptEvent.registerScriptEvent(AnvilBlockDamagedScriptEvent.class);
         ScriptEvent.registerScriptEvent(AreaEnterExitScriptEventPaperImpl.class);
         ScriptEvent.registerScriptEvent(BellRingScriptEvent.class);
+        ScriptEvent.registerScriptEvent(BlockPreDispenseScriptEvent.class);
         ScriptEvent.registerScriptEvent(CreeperIgnitesScriptEvent.class);
         ScriptEvent.registerScriptEvent(EntityAddToWorldScriptEvent.class);
         ScriptEvent.registerScriptEvent(EntityKnocksbackEntityScriptEvent.class);
@@ -45,9 +45,13 @@ public class PaperModule {
         ScriptEvent.registerScriptEvent(ExperienceOrbMergeScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerAbsorbsExperienceScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerBeaconEffectScriptEvent.class);
+        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_18)) {
+            ScriptEvent.registerScriptEvent(PlayerChangesFramedItemScriptEvent.class);
+        }
         ScriptEvent.registerScriptEvent(PlayerChoosesArrowScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerClicksFakeEntityScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerClicksInRecipeBookScriptEvent.class);
+        ScriptEvent.registerScriptEvent(PlayerClientOptionsChangeScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerCompletesAdvancementScriptEventPaperImpl.class);
         ScriptEvent.registerScriptEvent(PlayerDeepSleepScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerElytraBoostScriptEvent.class);
@@ -59,6 +63,9 @@ public class PaperModule {
         ScriptEvent.registerScriptEvent(PlayerJumpsScriptEventPaperImpl.class);
         ScriptEvent.registerScriptEvent(PlayerGrantedAdvancementCriterionScriptEvent.class);
         ScriptEvent.registerScriptEvent(PlayerLoomPatternSelectScriptEvent.class);
+        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_20)) {
+            ScriptEvent.registerScriptEvent(PlayerOpenSignScriptEvent.class);
+        }
         ScriptEvent.registerScriptEvent(PlayerPreparesGrindstoneCraftScriptEvent.class);
         if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_18)) {
             ScriptEvent.registerScriptEvent(PlayerRaiseLowerItemScriptEventPaperImpl.class);
@@ -76,6 +83,7 @@ public class PaperModule {
         ScriptEvent.registerScriptEvent(ServerListPingScriptEventPaperImpl.class);
         ScriptEvent.registerScriptEvent(ServerResourcesReloadedScriptEvent.class);
         ScriptEvent.registerScriptEvent(SkeletonHorseTrapScriptEvent.class);
+        ScriptEvent.registerScriptEvent(TargetBlockHitScriptEvent.class);
         if (NMSHandler.getVersion().isAtMost(NMSVersion.v1_18)) {
             ScriptEvent.registerScriptEvent(TNTPrimesScriptEvent.class);
         }
@@ -97,20 +105,24 @@ public class PaperModule {
         PropertyParser.registerProperty(EntityCarryingEgg.class, EntityTag.class);
         PropertyParser.registerProperty(EntityDrinkingPotion.class, EntityTag.class);
         if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
+            PropertyParser.registerProperty(EntityEggLayTime.class, EntityTag.class);
             PropertyParser.registerProperty(EntityFriction.class, EntityTag.class);
         }
+        PropertyParser.registerProperty(EntityLeftHanded.class, EntityTag.class);
         PropertyParser.registerProperty(EntityReputation.class, EntityTag.class);
         PropertyParser.registerProperty(EntityShouldBurn.class, EntityTag.class);
+        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
+            PropertyParser.registerProperty(EntitySneaking.class, EntityTag.class);
+        }
         PropertyParser.registerProperty(EntityWitherInvulnerable.class, EntityTag.class);
         PropertyParser.registerProperty(ItemArmorStand.class, ItemTag.class);
 
         // Paper object extensions
-        PropertyParser.registerProperty(PaperEntityProperties.class, EntityTag.class);
-        PropertyParser.registerProperty(PaperItemTagProperties.class, ItemTag.class);
-        PropertyParser.registerProperty(PaperWorldProperties.class, WorldTag.class);
-        PaperPlayerExtensions.register();
         PaperElementExtensions.register();
-
+        PaperEntityExtensions.register();
+        PaperItemExtensions.register();
+        PaperPlayerExtensions.register();
+        PaperWorldExtensions.register();
         // Paper Tags
         new PaperTagBase();
 
@@ -124,7 +136,13 @@ public class PaperModule {
         if (text == null) {
             return null;
         }
-        return jsonToComponent(FormattedTextHelper.componentToJson(FormattedTextHelper.parse(text, baseColor)));
+        try {
+            return jsonToComponent(FormattedTextHelper.componentToJson(FormattedTextHelper.parse(text, baseColor)));
+        }
+        catch (Exception ex) {
+            Debug.verboseLog("Failed to parse formatted text: " + text.replace(ChatColor.COLOR_CHAR, '&'));
+            throw ex;
+        }
     }
 
     public static String stringifyComponent(Component component) {
@@ -138,7 +156,13 @@ public class PaperModule {
         if (json == null) {
             return null;
         }
-        return GsonComponentSerializer.gson().deserialize(json);
+        try {
+            return GsonComponentSerializer.gson().deserialize(json);
+        }
+        catch (Exception ex) {
+            Debug.verboseLog("Failed to parse json to component: " + json);
+            throw ex;
+        }
     }
 
     public static String componentToJson(Component component) {

@@ -26,7 +26,10 @@ import com.denizenscript.denizencore.scripts.ScriptRegistry;
 import com.denizenscript.denizencore.scripts.commands.core.AdjustCommand;
 import com.denizenscript.denizencore.scripts.commands.core.SQLCommand;
 import com.denizenscript.denizencore.scripts.containers.ScriptContainer;
-import com.denizenscript.denizencore.tags.*;
+import com.denizenscript.denizencore.tags.Attribute;
+import com.denizenscript.denizencore.tags.PseudoObjectTagBase;
+import com.denizenscript.denizencore.tags.TagManager;
+import com.denizenscript.denizencore.tags.TagRunnable;
 import com.denizenscript.denizencore.tags.core.UtilTagBase;
 import com.denizenscript.denizencore.utilities.CoreConfiguration;
 import com.denizenscript.denizencore.utilities.CoreUtilities;
@@ -228,6 +231,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // This is formatted equivalently to the item script recipe input, with "material:" for non-exact matches, and a full ItemTag for exact matches.
         // Note that this won't represent all recipes perfectly (primarily those with multiple input choices per slot).
         // Brewing recipes are only supported on Paper, and only custom ones are available.
+        // For brewing recipes, currently "matcher:<item matcher>" input options are only supported in recipes added by Denizen.
         // For furnace-style and stonecutting recipes, this will return a list with only 1 item.
         // For shaped recipes, this will include 'air' for slots that are part of the shape but don't require an item.
         // For smithing recipes, this will return a list with the 'base' item and the 'addition'.
@@ -277,8 +281,18 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
                 addChoice.accept(smithingRecipe.getAddition());
             }
             else if (brewingRecipe != null) {
-                addChoice.accept(brewingRecipe.ingredient());
-                addChoice.accept(brewingRecipe.input());
+                if (brewingRecipe.ingredient() instanceof RecipeChoice.ExactChoice || brewingRecipe.ingredient() instanceof RecipeChoice.MaterialChoice) {
+                    addChoice.accept(brewingRecipe.ingredient());
+                }
+                else {
+                    recipeItems.addObject(new ElementTag(PaperAPITools.instance.getBrewingRecipeIngredientMatcher(recipeKey), true));
+                }
+                if (brewingRecipe.input() instanceof RecipeChoice.ExactChoice || brewingRecipe.input() instanceof RecipeChoice.MaterialChoice) {
+                    addChoice.accept(brewingRecipe.input());
+                }
+                else {
+                    recipeItems.addObject(new ElementTag(PaperAPITools.instance.getBrewingRecipeInputMatcher(recipeKey), true));
+                }
             }
             return recipeItems;
         });
@@ -604,7 +618,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @description
         // See <@link tag FlaggableObject.list_flags>
         // -->
-        tagProcessor.registerTag(ListTag.class, ElementTag.class, "list_flags", (attribute, object, input) -> {
+        tagProcessor.registerTag(ListTag.class, "list_flags", (attribute, object) -> {
             return DenizenCore.serverFlagMap.doListFlagsTag(attribute);
         });
 
@@ -674,7 +688,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @description
         // Returns a list of all registered advancement names.
         // Generally used with <@link tag PlayerTag.has_advancement>.
-        // See also <@link url https://minecraft.fandom.com/wiki/Advancement>.
+        // See also <@link url https://minecraft.wiki/w/Advancement>.
         // -->
         tagProcessor.registerTag(ListTag.class, "advancement_types", (attribute, object) -> {
             listDeprecateWarn(attribute);
@@ -793,6 +807,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // Returns a list of all materials known to the server.
         // Generally used with <@link objecttype MaterialTag>.
         // This is only types listed in the Bukkit Material enum, as seen at <@link url https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Material.html>.
+        // Note: Some materials might be disabled in specific worlds, check using <@link tag MaterialTag.is_enabled>.
         // -->
         tagProcessor.registerStaticTag(ListTag.class, "material_types", (attribute, object) -> {
             listDeprecateWarn(attribute);
@@ -859,7 +874,11 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
             ListTag potionEffects = new ListTag();
             for (PotionEffectType potionEffect : PotionEffectType.values()) {
                 if (potionEffect != null) {
-                    potionEffects.add(potionEffect.getName());
+                    String name = potionEffect.getName();
+                    if (name.startsWith("minecraft:")) {
+                        name = CoreUtilities.toUpperCase(name.substring("minecraft:".length()));
+                    }
+                    potionEffects.add(name);
                 }
             }
             return potionEffects;
@@ -930,18 +949,32 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // <--[tag]
         // @attribute <server.structure_types>
         // @returns ListTag
+        // @deprecated use 'server.structures' on 1.19+.
         // @description
-        // Returns a list of all structure types known to the server.
-        // Generally used with <@link tag LocationTag.find.structure.within>.
-        // This is NOT their Bukkit names, as seen at <@link url https://hub.spigotmc.org/javadocs/spigot/org/bukkit/StructureType.html>.
-        // Instead these are the internal names tracked by Spigot and presumably matching Minecraft internals.
-        // These are all lowercase, as the internal names are lowercase and supposedly are case-sensitive.
-        // It is unclear why the "StructureType" class in Bukkit is not simply an enum as most similar listings are.
+        // Deprecated in favor of <@link tag server.structures> on 1.19+.
         // -->
         tagProcessor.registerTag(ListTag.class, "structure_types", (attribute, object) -> {
             listDeprecateWarn(attribute);
+            if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
+                BukkitImplDeprecations.oldStructureTypes.warn(attribute.context);
+            }
             return new ListTag(StructureType.getStructureTypes().keySet());
         }, "list_structure_types");
+
+        if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
+
+            // <--[tag]
+            // @attribute <server.structures>
+            // @returns ListTag
+            // @description
+            // Returns a list of all structures known to the server, including custom ones added by datapacks.
+            // For more information and a list of default structures, see <@link url https://minecraft.wiki/w/Structure>.
+            // For locating specific structures, see <@link language Structure lookups>.
+            // -->
+            tagProcessor.registerTag(ListTag.class, "structures", (attribute, object) -> {
+                return new ListTag(Registry.STRUCTURE.stream().toList(), structure -> new ElementTag(Utilities.namespacedKeyToString(structure.getKey()), true));
+            });
+        }
 
         // <--[tag]
         // @attribute <server.statistic_type[<statistic>]>
@@ -1629,7 +1662,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @attribute <server.vanilla_entity_tags>
         // @returns ListTag
         // @description
-        // Returns a list of vanilla tags applicable to entity types. See also <@link url https://minecraft.fandom.com/wiki/Tag>.
+        // Returns a list of vanilla tags applicable to entity types. See also <@link url https://minecraft.wiki/w/Tag>.
         // -->
         tagProcessor.registerTag(ListTag.class, "vanilla_entity_tags", (attribute, object) -> {
             return new ListTag(VanillaTagHelper.entityTagsByKey.keySet());
@@ -1639,7 +1672,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @attribute <server.vanilla_tagged_entities[<tag>]>
         // @returns ListTag(EntityTag)
         // @description
-        // Returns a list of entity types referred to by the specified vanilla tag. See also <@link url https://minecraft.fandom.com/wiki/Tag>.
+        // Returns a list of entity types referred to by the specified vanilla tag. See also <@link url https://minecraft.wiki/w/Tag>.
         // -->
         tagProcessor.registerTag(ListTag.class, ElementTag.class, "vanilla_tagged_entities", (attribute, object, tag) -> {
             Set<EntityType> entityTypes = VanillaTagHelper.entityTagsByKey.get(tag.asLowerString());
@@ -1657,7 +1690,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @attribute <server.vanilla_material_tags>
         // @returns ListTag
         // @description
-        // Returns a list of vanilla tags applicable to blocks, fluids, or items. See also <@link url https://minecraft.fandom.com/wiki/Tag>.
+        // Returns a list of vanilla tags applicable to blocks, fluids, or items. See also <@link url https://minecraft.wiki/w/Tag>.
         // -->
         tagProcessor.registerTag(ListTag.class, "vanilla_material_tags", (attribute, object) -> {
             return new ListTag(VanillaTagHelper.materialTagsByKey.keySet());
@@ -1667,7 +1700,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // @attribute <server.vanilla_tagged_materials[<tag>]>
         // @returns ListTag(MaterialTag)
         // @description
-        // Returns a list of materials referred to by the specified vanilla tag. See also <@link url https://minecraft.fandom.com/wiki/Tag>.
+        // Returns a list of materials referred to by the specified vanilla tag. See also <@link url https://minecraft.wiki/w/Tag>.
         // -->
         tagProcessor.registerTag(ListTag.class, ElementTag.class, "vanilla_tagged_materials", (attribute, object, tag) -> {
             Set<Material> materials = VanillaTagHelper.materialTagsByKey.get(tag.asLowerString());
@@ -1734,7 +1767,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         //
         // Some inputs will be strictly required for some loot tables, and ignored for others.
         //
-        // A list of valid loot tables can be found here: <@link url https://minecraft.fandom.com/wiki/Loot_table#List_of_loot_tables>
+        // A list of valid loot tables can be found here: <@link url https://minecraft.wiki/w/Loot_table#List_of_loot_tables>
         // Note that the tree view represented on the wiki should be split by slashes for the input - for example, "cow" is under "entities" in the tree so "entities/cow" is how you input that.
         // CAUTION: Invalid loot table IDs will generate an empty list rather than an error.
         //
@@ -1803,11 +1836,11 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
             MapTag worlds = new MapTag();
             for (Map.Entry<String, NotedAreaTracker.PerWorldSet> set : NotedAreaTracker.worlds.entrySet()) {
                 MapTag worldData = new MapTag();
-                worldData.putObject("global", new ListTag(set.getValue().globalSet.list.stream().map(t -> t.area).toList()));
-                worldData.putObject("x50", areaNotesDebugStreamHack(set.getValue().sets50));
-                worldData.putObject("x50_offset", areaNotesDebugStreamHack(set.getValue().sets50_offset));
-                worldData.putObject("x200", areaNotesDebugStreamHack(set.getValue().sets200));
-                worldData.putObject("x200_offset", areaNotesDebugStreamHack(set.getValue().sets200_offset));
+                worldData.putObject("global", new ListTag(set.getValue().globalSet.list, trackedArea -> trackedArea.area));
+                worldData.putObject("x50", areaNotesDebug(set.getValue().sets50));
+                worldData.putObject("x50_offset", areaNotesDebug(set.getValue().sets50_offset));
+                worldData.putObject("x200", areaNotesDebug(set.getValue().sets200));
+                worldData.putObject("x200_offset", areaNotesDebug(set.getValue().sets200_offset));
                 worlds.putObject(set.getKey(), worldData);
             }
             return worlds;
@@ -1899,7 +1932,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // Immediately saves the Denizen saves files.
         // -->
         tagProcessor.registerMechanism("save", false, (object, mechanism) -> {
-            DenizenCore.saveAll();
+            DenizenCore.saveAll(false);
             Denizen.getInstance().saveSaves(false);
         });
 
@@ -1979,7 +2012,7 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         // - debug log "The custom red is <&[myred]>"
         // -->
         tagProcessor.registerMechanism("default_colors", false, MapTag.class, (object, mechanism, input) -> {
-            for (Map.Entry<StringHolder, ObjectTag> pair : input.map.entrySet()) {
+            for (Map.Entry<StringHolder, ObjectTag> pair : input.entrySet()) {
                 String name = pair.getKey().low;
                 if (!CustomColorTagBase.customColors.containsKey(name)) {
                     CustomColorTagBase.customColors.put(name, pair.getValue().toString().replace("<", "<&lt>"));
@@ -2399,10 +2432,10 @@ public class ServerTagBase extends PseudoObjectTagBase<ServerTagBase> {
         }, deprecatedVariants);
     }
 
-    private static MapTag areaNotesDebugStreamHack(Int2ObjectOpenHashMap<NotedAreaTracker.AreaSet> set) {
+    private static MapTag areaNotesDebug(Int2ObjectOpenHashMap<NotedAreaTracker.AreaSet> set) {
         MapTag out = new MapTag();
         for (Int2ObjectMap.Entry<NotedAreaTracker.AreaSet> pair : set.int2ObjectEntrySet()) {
-            out.putObject(String.valueOf(pair.getIntKey()), new ListTag(pair.getValue().list.stream().map(t -> t.area).toList()));
+            out.putObject(String.valueOf(pair.getIntKey()), new ListTag(pair.getValue().list, trackedArea -> trackedArea.area));
         }
         return out;
     }

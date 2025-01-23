@@ -1,6 +1,5 @@
 package com.denizenscript.denizen.utilities;
 
-import com.denizenscript.denizen.objects.MaterialTag;
 import com.denizenscript.denizen.objects.PlayerTag;
 import com.denizenscript.denizen.objects.properties.entity.EntityColor;
 import com.denizenscript.denizencore.objects.Mechanism;
@@ -9,7 +8,6 @@ import com.denizenscript.denizencore.objects.core.ElementTag;
 import com.denizenscript.denizencore.objects.core.ListTag;
 import com.denizenscript.denizencore.objects.core.MapTag;
 import org.bukkit.World;
-import org.bukkit.block.data.type.PinkPetals;
 import org.bukkit.entity.*;
 
 public class MultiVersionHelper1_19 {

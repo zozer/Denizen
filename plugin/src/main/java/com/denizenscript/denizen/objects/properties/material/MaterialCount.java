@@ -10,18 +10,14 @@ import com.denizenscript.denizencore.objects.core.ElementTag;
 import com.denizenscript.denizencore.objects.properties.Property;
 import com.denizenscript.denizencore.objects.properties.PropertyParser;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.Candle;
-import org.bukkit.block.data.type.RespawnAnchor;
-import org.bukkit.block.data.type.SeaPickle;
-import org.bukkit.block.data.type.TurtleEgg;
+import org.bukkit.block.data.type.*;
 
 public class MaterialCount implements Property {
 
     public static boolean describes(ObjectTag material) {
-        if (!(material instanceof MaterialTag)) {
+        if (!(material instanceof MaterialTag mat)) {
             return false;
         }
-        MaterialTag mat = (MaterialTag) material;
         if (!mat.hasModernData()) {
             return false;
         }
@@ -30,7 +26,7 @@ public class MaterialCount implements Property {
                 || data instanceof TurtleEgg
                 || data instanceof RespawnAnchor
                 || data instanceof Candle
-                || (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && MultiVersionHelper1_19.isCountable(mat));
+                || (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && data instanceof PinkPetals);
     }
 
     public static MaterialCount getFrom(ObjectTag _material) {
@@ -136,8 +132,8 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return getCandle().getCandles();
         }
-        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
-            return MultiVersionHelper1_19.getCount(material);
+        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+            return pinkPetals.getFlowerAmount();
         }
         throw new UnsupportedOperationException();
     }
@@ -155,8 +151,8 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return getCandle().getMaximumCandles();
         }
-        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
-            return MultiVersionHelper1_19.getMaxCount(material);
+        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+            return pinkPetals.getMaximumFlowerAmount();
         }
         throw new UnsupportedOperationException();
     }
@@ -174,8 +170,8 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return 1;
         }
-        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
-            return MultiVersionHelper1_19.getMinCount(material);
+        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals)) {
+            return 1;
         }
         throw new UnsupportedOperationException();
     }
@@ -222,8 +218,8 @@ public class MaterialCount implements Property {
             else if (isCandle()) {
                 getCandle().setCandles(count);
             }
-            else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19)) {
-                MultiVersionHelper1_19.setCount(material, count);
+            else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+                pinkPetals.setFlowerAmount(count);
             }
         }
     }

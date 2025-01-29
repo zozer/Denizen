@@ -131,7 +131,7 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return getCandle().getCandles();
         }
-        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals) {
             return pinkPetals.getFlowerAmount();
         }
         throw new UnsupportedOperationException();
@@ -150,7 +150,7 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return getCandle().getMaximumCandles();
         }
-        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals) {
             return pinkPetals.getMaximumFlowerAmount();
         }
         throw new UnsupportedOperationException();
@@ -169,7 +169,7 @@ public class MaterialCount implements Property {
         else if (isCandle()) {
             return 1;
         }
-        else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals)) {
+        else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals) {
             return 1;
         }
         throw new UnsupportedOperationException();
@@ -217,7 +217,7 @@ public class MaterialCount implements Property {
             else if (isCandle()) {
                 getCandle().setCandles(count);
             }
-            else if ((NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals)) {
+            else if (NMSHandler.getVersion().isAtLeast(NMSVersion.v1_19) && material.getModernData() instanceof PinkPetals pinkPetals) {
                 pinkPetals.setFlowerAmount(count);
             }
         }
